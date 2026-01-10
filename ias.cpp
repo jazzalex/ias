@@ -4,6 +4,9 @@
 
 using namespace std::chrono;
 
+auto start = high_resolution_clock::now();
+auto over  = high_resolution_clock::now();
+
 static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
                               unsigned long framesPerBuffer,
                               const PaStreamCallbackTimeInfo* timeInfo,
@@ -21,11 +24,11 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
     timeval result;
 
     #ifdef WIN32
-	auto end = high_resolution_clock::now();
+        over = high_resolution_clock::now();
 
-	duration_cast<microseconds>(end - start).count();
+        duration_cast<microseconds>(over - start).count();
 
-	//cout << "CALLBACK-INTERVAL: " << duration_cast<microseconds>(end - start).count() << " us" << endl;
+        cout << "CALLBACK-INTERVAL: " << duration_cast<microseconds>(over - start).count() << " us" << endl;
     #else
         gettimeofday(&result, NULL);
 
@@ -68,8 +71,8 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
     if (my->even == true) my->even = false; else my->even = true;
 
     /// START TIME MEASUREMENT
-    #ifdef WIN32 
-        auto start = high_resolution_clock::now();
+    #ifdef WIN32
+        start = high_resolution_clock::now();
     #else
         gettimeofday(&result, NULL);
     #endif
@@ -128,7 +131,7 @@ ias::ias(){
 
     bzero( &inputParameters, sizeof( inputParameters ) );
     inputParameters.channelCount = audioChannels;
-    inputParameters.device = 2;//4;//3;//
+    inputParameters.device = 1;//2;
     inputParameters.sampleFormat = paInt16;
 
     inputParameters.hostApiSpecificStreamInfo = NULL;
@@ -141,7 +144,7 @@ ias::ias(){
 
     bzero( &outputParameters, sizeof( outputParameters ) );
     outputParameters.channelCount = audioChannels;
-    outputParameters.device = 3;//2;//1
+    outputParameters.device = 1;//3;
     outputParameters.sampleFormat = paInt16;
 
     outputParameters.hostApiSpecificStreamInfo = NULL;
