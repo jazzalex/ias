@@ -1,3 +1,3 @@
 #!/bin/sh
 export PATH=./:$PATH/
-./ias.app/Contents/MacOS/ias
+./ias-reference-code.app/Contents/MacOS/ias-reference-code
