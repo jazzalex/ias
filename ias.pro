@@ -1,5 +1,7 @@
 TARGET = ias-reference-code
 
+PORTAUDIOPATH= ./include/portaudio
+
 linux{
   CONFIG   += x11
   
@@ -15,16 +17,36 @@ linux{
 }
 
 macx{
-  QMAKE_LIBDIR += ./lib/OSX/celt/
-  QMAKE_LIBDIR += ./lib/OSX/pa/  
-
   LIBS      += -framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreServices 
-  LIBS      += -lportaudio
   LIBS      += -lpthread
 
   DEFINES  += __MACOSX_CORE__
 
   include(./shared.pri)
+
+  INCLUDEPATH+= $${PORTAUDIOPATH}/include
+  INCLUDEPATH+= $${PORTAUDIOPATH}/src/common
+  INCLUDEPATH+= $${PORTAUDIOPATH}/src/os/unix
+
+  SOURCES+= $${PORTAUDIOPATH}/src/common/pa_debugprint.c
+  SOURCES+= $${PORTAUDIOPATH}/src/common/pa_ringbuffer.c
+  SOURCES+= $${PORTAUDIOPATH}/src/common/pa_front.c
+  SOURCES+= $${PORTAUDIOPATH}/src/common/pa_process.c
+  SOURCES+= $${PORTAUDIOPATH}/src/common/pa_allocation.c
+  SOURCES+= $${PORTAUDIOPATH}/src/common/pa_dither.c
+  SOURCES+= $${PORTAUDIOPATH}/src/common/pa_cpuload.c
+  SOURCES+= $${PORTAUDIOPATH}/src/common/pa_stream.c
+  SOURCES+= $${PORTAUDIOPATH}/src/common/pa_trace.c
+  SOURCES+= $${PORTAUDIOPATH}/src/common/pa_converters.c
+  SOURCES+= $${PORTAUDIOPATH}/src/hostapi/skeleton/pa_hostapi_skeleton.c
+
+  SOURCES+= $${PORTAUDIOPATH}/src/hostapi/coreaudio/pa_mac_core_utilities.c
+  SOURCES+= $${PORTAUDIOPATH}/src/hostapi/coreaudio/pa_mac_core_blocking.c
+  SOURCES+= $${PORTAUDIOPATH}/src/hostapi/coreaudio/pa_mac_core.c
+  DEFINES+= PA_USE_COREAUDIO=1
+
+  SOURCES+= $${PORTAUDIOPATH}/src/os/unix/pa_unix_hostapis.c
+  SOURCES+= $${PORTAUDIOPATH}/src/os/unix/pa_unix_util.c
 }
 
 win32{
@@ -49,8 +71,6 @@ win32{
   LIBS        += odbccp32.lib
 
   DEFINES     += PA_USE_ASIO=1
-
-  PORTAUDIOPATH= ./include/portaudio
 
   INCLUDEPATH+= $${PORTAUDIOPATH}/include
   INCLUDEPATH+= $${PORTAUDIOPATH}/src/common
@@ -82,8 +102,6 @@ win32{
   SOURCES+= $${PORTAUDIOPATH}/src/os/win/pa_win_waveformat.c
   SOURCES+= $${PORTAUDIOPATH}/src/os/win/pa_x86_plain_converters.c
 }
-
-INCLUDEPATH += ./include/portaudio
 
 CONFIG += thread qt warn_on exceptions 
 

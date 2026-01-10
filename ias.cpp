@@ -122,7 +122,7 @@ ias::ias(){
 
     bzero( &inputParameters, sizeof( inputParameters ) );
     inputParameters.channelCount = audioChannels;
-    inputParameters.device = 1;//4;//3;//
+    inputParameters.device = 2;//4;//3;//
     inputParameters.sampleFormat = paInt16;
 
     inputParameters.hostApiSpecificStreamInfo = NULL;
@@ -135,7 +135,7 @@ ias::ias(){
 
     bzero( &outputParameters, sizeof( outputParameters ) );
     outputParameters.channelCount = audioChannels;
-    outputParameters.device = 1;//2;//1
+    outputParameters.device = 3;//2;//1
     outputParameters.sampleFormat = paInt16;
 
     outputParameters.hostApiSpecificStreamInfo = NULL;
