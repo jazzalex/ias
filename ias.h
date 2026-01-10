@@ -16,7 +16,9 @@
 #ifndef WIN32
     #include <sys/time.h>
 #else
-    #include <winsock2.h>
+   //#include <windows.h>
+   #include <chrono>
+   #include <winsock2.h>
 #endif
 
 #include <udp.h>

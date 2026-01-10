@@ -2,6 +2,8 @@
 #include <QCoreApplication>
 #include <udp.h>
 
+using namespace std::chrono;
+
 static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
                               unsigned long framesPerBuffer,
                               const PaStreamCallbackTimeInfo* timeInfo,
@@ -19,15 +21,19 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
     timeval result;
 
     #ifdef WIN32
-        //my->myIAS->gettimeofday(&result, NULL);
+	auto end = high_resolution_clock::now();
+
+	duration_cast<microseconds>(end - start).count();
+
+	//cout << "CALLBACK-INTERVAL: " << duration_cast<microseconds>(end - start).count() << " us" << endl;
     #else
         gettimeofday(&result, NULL);
-    #endif
 
-    my->after = (double) ((result.tv_sec*1000) + (((double) result.tv_usec) / 1000));
-    my->callbackInterval = my->after - my->before;
+	my->after = (double) ((result.tv_sec*1000) + (((double) result.tv_usec) / 1000));
+        my->callbackInterval = my->after - my->before;
   
-    //cout << "SAMPLES: " << framesPerBuffer << " EVEN: " << my->even <<  " CALLBACK-INTERVAL: " << my->callbackInterval << endl;//" CALC: " << my->playoutCbck << endl;*/
+        //cout << "SAMPLES: " << framesPerBuffer << " EVEN: " << my->even <<  " CALLBACK-INTERVAL: " << my->callbackInterval << endl;//" CALC: " << my->playoutCbck << endl;*/
+    #endif
 
     /// DEFINE INPUT AND OUTPUT BUFFER
     char *input  = (char*) inputBuffer;
@@ -63,7 +69,7 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
 
     /// START TIME MEASUREMENT
     #ifdef WIN32 
-        //my->myIAS->gettimeofday(&result, NULL);
+        auto start = high_resolution_clock::now();
     #else
         gettimeofday(&result, NULL);
     #endif
