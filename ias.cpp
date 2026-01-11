@@ -35,7 +35,8 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
 	my->after = (double) ((result.tv_sec*1000) + (((double) result.tv_usec) / 1000));
         my->callbackInterval = my->after - my->before;
   
-        //cout << "SAMPLES: " << framesPerBuffer << " EVEN: " << my->even <<  " CALLBACK-INTERVAL: " << my->callbackInterval << endl;//" CALC: " << my->playoutCbck << endl;*/
+        cout << "SAMPLES: " << framesPerBuffer << " EVEN: " << my->even <<  " CALLBACK-INTERVAL: " << my->callbackInterval << endl;
+	//cout << " CALC: " << my->playoutCbck << endl;
     #endif
 
     /// DEFINE INPUT AND OUTPUT BUFFER

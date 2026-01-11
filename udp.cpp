@@ -11,6 +11,8 @@ udp::udp(QObject *parent):
 
     inputPacket    = new char[1024];
     outputPacket   = new char[1024];
+
+    recBytes = 1024;
 }
 
 void udp::sendInput(){
