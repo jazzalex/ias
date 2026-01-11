@@ -55,11 +55,11 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
     /// SEND AUDIO PACKET
     my->myIAS->client.sendInput();
 
-    unsigned int threshold = 1;
+    unsigned int threshold = 2;
 
     /// READ FROM FIFO IF THRESHOLD IS REACHED
-    if (my->myIAS->client.fifo.size() > (threshold * my->myIAS->client.recBytes) ){
-        for (unsigned int i=0; i < my->myIAS->client.recBytes;i++) output[i] = my->myIAS->client.fifo.dequeue();
+    if (my->myIAS->client.fifo.size() > (threshold * framesPerBuffer * 2) ){
+        for (unsigned int i=0; i < framesPerBuffer*2;i++) output[i] = my->myIAS->client.fifo.dequeue();
     }
 
     /// RECTANGLE GENERATOR
