@@ -55,7 +55,7 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
     /// SEND AUDIO PACKET
     my->myIAS->client.sendInput();
 
-    unsigned int threshold = 2;
+    unsigned int threshold = 10;
 
     /// READ FROM FIFO IF THRESHOLD IS REACHED
     if (my->myIAS->client.fifo.size() > (threshold * framesPerBuffer * 2) ){
@@ -131,7 +131,7 @@ ias::ias(){
 
     bzero( &inputParameters, sizeof( inputParameters ) );
     inputParameters.channelCount = audioChannels;
-    inputParameters.device = 1;//2;
+    inputParameters.device = 2;//2;
     inputParameters.sampleFormat = paInt16;
 
     inputParameters.hostApiSpecificStreamInfo = NULL;
@@ -144,7 +144,7 @@ ias::ias(){
 
     bzero( &outputParameters, sizeof( outputParameters ) );
     outputParameters.channelCount = audioChannels;
-    outputParameters.device = 1;//3;
+    outputParameters.device = 3;//3;
     outputParameters.sampleFormat = paInt16;
 
     outputParameters.hostApiSpecificStreamInfo = NULL;
