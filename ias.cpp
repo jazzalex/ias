@@ -4,71 +4,88 @@
 
 using namespace std::chrono;
 
+/// PREPARATIONS
 auto start = high_resolution_clock::now();
 auto over  = high_resolution_clock::now();
 
+
+/// CALLBACK FUNCTION
 static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
                               unsigned long framesPerBuffer,
                               const PaStreamCallbackTimeInfo* timeInfo,
                               PaStreamCallbackFlags statusFlags,
                               void *data ){
-   
+
+    /// PREPARATIONS
     (void) framesPerBuffer;
     (void) timeInfo;
     (void) statusFlags;
- 
     ias::callbackdata *my;
     my = (ias::callbackdata *) data;
- 
-    /// END TIME MEASUREMENT
-    timeval result;
-
-    #ifdef WIN32
-        over = high_resolution_clock::now();
-
-        duration_cast<microseconds>(over - start).count();
-
-        cout << "CALLBACK-INTERVAL: " << duration_cast<microseconds>(over - start).count() << " us" << endl;
-    #else
-        gettimeofday(&result, NULL);
-
-	my->after = (double) ((result.tv_sec*1000) + (((double) result.tv_usec) / 1000));
-        my->callbackInterval = my->after - my->before;
-  
-        //cout << "SAMPLES: " << framesPerBuffer << " EVEN: " << my->even <<  " CALLBACK-INTERVAL: " << my->callbackInterval << endl;
-    #endif
-
-    /// DEFINE INPUT AND OUTPUT BUFFER
     char *input  = (char*) inputBuffer;
     char *output = (char*) outputBuffer;
- 
-    /// WRITE INPUTBUFFER TO OUTPUTBUFFER
-    for (unsigned short i=0; i<framesPerBuffer*2;i++) {
-        //output[i] = input[i];
+
+
+    /// END TIME MEASUREMENT
+    timeval result;
+    #ifdef WIN32
+        over = high_resolution_clock::now();
+        duration_cast<microseconds>(over - start).count();
+    #else
+        gettimeofday(&result, NULL);
+        my->after = (double) ((result.tv_sec*1000) + (((double) result.tv_usec) / 1000));
+        my->callbackInterval = my->after - my->before;
+    #endif
+
+    /// CHOOSE IAS OPTION
+    int option = 0; /// 0: PLOT CALLBACK INTERVAL 1: RECTANGLE GENERATOR, 2: INPUT=OUTPUT, 3: NETWORK MIRROR
+
+    if (option == 0){
+        #ifndef WIN32
+            cout << "CALLBACK-INTERVAL: " << my->callbackInterval << " ms" << endl;
+        #else
+            cout << "CALLBACK-INTERVAL: " << duration_cast<microseconds>(over - start).count() << " us" << endl;
+        #endif
     }
 
-    /// FILL INPUT BUFFER
-    for (unsigned short i=0; i<framesPerBuffer*2;i++) {
-        my->myIAS->client.inputPacket[i] = input[i];
+
+    if (option == 1){
+        /// RECTANGLE GENERATOR
+        for (int i=0; i<(int)framesPerBuffer*2;i++){
+            if (my->even == true) output[i] = (char) 128; else output[i] = (char) -127;
+        }
+
+        /// CHANGE EVEN TO ODD AND VICE VERSA
+        if (my->even == true) my->even = false; else my->even = true;
     }
 
-    /// SEND AUDIO PACKET
-    my->myIAS->client.sendInput();
 
-    unsigned int threshold = 10;
-
-    /// READ FROM FIFO IF THRESHOLD IS REACHED
-    if (my->myIAS->client.fifo.size() > (threshold * framesPerBuffer * 2) ){
-        for (unsigned int i=0; i < framesPerBuffer*2;i++) output[i] = my->myIAS->client.fifo.dequeue();
+    if ( (option == 2) || (option == 3) ){
+        /// OPTION 1: WRITE INPUTBUFFER TO OUTPUTBUFFER
+        for (unsigned short i=0; i<framesPerBuffer*2;i++) {
+            output[i] = input[i];
+        }
     }
 
-    /// RECTANGLE GENERATOR
-    for (int i=0; i<(int)framesPerBuffer*2;i++){
-        //if (my->even == true) output[i] = 244; else output[i] = 0;
+
+    if (option == 3){
+        /// FILL INPUT BUFFER
+        for (unsigned short i=0; i<framesPerBuffer*2;i++) {
+            my->myIAS->client.inputPacket[i] = input[i];
+        }
+
+        /// SEND AUDIO PACKET
+        my->myIAS->client.sendInput();
+
+
+        /// OPTION 2: READ FROM FIFO IF THRESHOLD IS REACHED
+        unsigned int threshold = 10;
+        if (my->myIAS->client.fifo.size() > (threshold * framesPerBuffer * 2) ){
+            for (unsigned int i=0; i < framesPerBuffer*2;i++) output[i] += my->myIAS->client.fifo.dequeue();
+        }
     }
- 
-    /// EVEN / ODD VERÄNDERN
-    if (my->even == true) my->even = false; else my->even = true;
+
+
 
     /// START TIME MEASUREMENT
     #ifdef WIN32
@@ -76,25 +93,25 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
     #else
         gettimeofday(&result, NULL);
     #endif
-
     my->before = (double) ((result.tv_sec*1000) + (((double) result.tv_usec) / 1000));
 
 
-    return 0;  
+    return 0;
 }
+
+
 
 /// CONSTRUCTOR
 ias::ias(){
 
+    /// PREPARATIONS
     this->ensureAVPermissions();
-
-    /// SPEICHER FÜR CALLBACK-DATA STRUCT RESERVIEREN
     dFC = new callbackdata();
     dFC->even = false;
-
     dFC->myIAS = this;
 
-    /// PORTAUDIO INITIALISIEREN
+
+    /// PORTAUDIO INIT
     paErr = Pa_Initialize();
 
     if (paErr == paNoError){
@@ -106,7 +123,7 @@ ias::ias(){
         }
     }
  
-    /// INFO ZU VORHANDENEN AUDIODEVICES AUSGEBEN
+    /// PLOT INFO WITH REGARD TO DETECTED DEVICES
     for (int i=0;i<=amountOfAudioDevices-1;i++) {
         info = Pa_GetDeviceInfo(i);
 
@@ -118,14 +135,15 @@ ias::ias(){
         cout << endl;
     }
 
-    /// PARAMETER FESTLEGEN 
+    /// SET DESIRED PARAMETERS
     audiofault = false;
     soundIsRunning = false;
-    frameSize  = 512;//128;
+
+    frameSize  = 128;
     sampleRate = 48000;
     audioChannels = 1;
 
-    /// AUDIODEVICE KONFIGURIEREN
+    /// CONFIGURE INPUT AUDIODEVICE
     PaStreamParameters outputParameters;
     PaStreamParameters inputParameters;
 
@@ -142,6 +160,8 @@ ias::ias(){
         inputParameters.hostApiSpecificStreamInfo = &coreAudioInputInfo;
     #endif
 
+
+    /// CONFIGURE OUTPUT AUDIODEVICE
     bzero( &outputParameters, sizeof( outputParameters ) );
     outputParameters.channelCount = audioChannels;
     outputParameters.device = 3;//3;
@@ -158,6 +178,8 @@ ias::ias(){
     inputParameters.suggestedLatency = 0.001;
     outputParameters.suggestedLatency = 0.001;
 
+
+    /// OPEN THE AUDIO STREAM
     paErr = Pa_OpenStream( &stream,
                           &inputParameters,
                           &outputParameters,
@@ -170,7 +192,7 @@ ias::ias(){
     if (paErr==paNoError) audiofault = false; else audiofault = true;
 
 
-    /// AUDIODEVICE STARTEN
+    /// LAUNCH THE AUDIO PROCESS
     if (!audiofault){
 
         #ifdef __LINUX_ALSA__
@@ -192,7 +214,7 @@ ias::ias(){
     }
 }
 
-
+/// DESTRUCTOR
 ias::~ias(){
     cout << "Program is destructed now ..." << endl;
 
@@ -204,6 +226,7 @@ ias::~ias(){
     } 
 }
 
+/// ENSURE PERMISSIONS
 void ias::ensureAVPermissions(){
 
     QMicrophonePermission microphonePermission;
