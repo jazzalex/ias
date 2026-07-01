@@ -236,9 +236,8 @@ ias::ias(){
     /// SENSOR RELATED
     sensor = new QAccelerometer();
     sensor->setAccelerationMode(QAccelerometer::User);
+    connect(sensor, &QAccelerometer::readingChanged, this, &ias::getSensorData);
     sensor->start();
-
-    this->getSensorData();
 }
 
 /// DESTRUCTOR
@@ -316,6 +315,13 @@ void ias::startVideo(int index) {
 
     saveVideoIndex = index;
 
+    if ( index < 0 || index >= availableCameras.size() ) {
+        cout << "No camera available at index " << index
+             << " (available: " << availableCameras.size() << ")" << endl;
+        videoReady = false;
+        return;
+    }
+
     QSize resolution(videoDisplayWidth, videoDisplayHeight); //16:9
 
     camera = new QCamera( availableCameras[index] );
@@ -362,7 +368,9 @@ void ias::startVideo(int index) {
 
     /// SETTINGS FÜR IMAGE CAPTURE
     captureSession.setCamera(camera);
-    captureSession.camera()->setCameraFormat( videoFormats[thisOne] );
+    if ( thisOne < videoFormats.size() ) {
+        captureSession.camera()->setCameraFormat( videoFormats[thisOne] );
+    }
     captureSession.setImageCapture(&imageCapture);
 
     imageCapture.setResolution(resolution);
@@ -447,9 +455,16 @@ void ias::processImage(int requestId, const QImage &img) {
 void ias::getSensorData(){
     cout << "READ SENSOR" << endl;
 
-    cout << "X: " << (int) sensor->reading()->x() << endl;
-    cout << "Y: " << (int) sensor->reading()->y() << endl;
-    cout << "Z: " << (int) sensor->reading()->z() << endl;
+    if ( sensor == nullptr || sensor->reading() == nullptr ) {
+        cout << "No sensor reading available yet" << endl;
+        return;
+    }
+
+    QAccelerometerReading *reading = sensor->reading();
+
+    cout << "X: " << (int) reading->x() << endl;
+    cout << "Y: " << (int) reading->y() << endl;
+    cout << "Z: " << (int) reading->z() << endl;
 
 }
 
