@@ -109,6 +109,10 @@ CONFIG += console
 
 QT += core network widgets multimedia multimediawidgets sensors
 
+# Qt 6.10.3 qyieldcpu.h uses the ARM __yield() intrinsic without including
+# <arm_acle.h>, which is fatal under -Werror on Apple Silicon clang.
+macos:QMAKE_CXXFLAGS += -include arm_acle.h
+
 HEADERS += ias.h \
 	   udp.h
 
