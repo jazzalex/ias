@@ -99,9 +99,10 @@ public :
     callbackdata *dFC;
 
     void ensureMicPermissions();
-    static bool ensureAVPermissions();
+    void ensureCameraPermission();
 
     /// VIDEO RELATED
+    void initVideoAndSensor();
     void startVideo(int index);
 
     unsigned short videoDisplayWidth  = 1080;

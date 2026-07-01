@@ -219,13 +219,12 @@ ias::ias(){
 
 
     /// VIDEO RELATED
-    ///
-    // Ensure permissions first
-    if ( !ensureAVPermissions() ) {
-        // This will make your current "Access to camera not granted" log consistent with the logic
-        std::cout << "Access to camera not granted" << std::endl;
-        return;
-    }
+    /// Camera permission is resolved asynchronously; initVideoAndSensor()
+    /// runs from the callback once permission is granted.
+    this->ensureCameraPermission();
+}
+
+void ias::initVideoAndSensor(){
 
     availableCameras = QMediaDevices::videoInputs();
     cout << "Available cameras: " << availableCameras.size() << endl;
@@ -260,7 +259,12 @@ void ias::ensureMicPermissions(){
     switch (qApp->checkPermission(microphonePermission)) {
 
     case Qt::PermissionStatus::Undetermined:
-        qApp->requestPermission(microphonePermission, this, &ias::ensureAVPermissions);
+        qApp->requestPermission(microphonePermission, this, [](const QPermission &permission){
+            if (permission.status() == Qt::PermissionStatus::Granted)
+                cout << "Mic permission is granted !" << endl;
+            else
+                qWarning("Microphone permission is not granted!");
+        });
         return;
 
     case Qt::PermissionStatus::Denied:
@@ -273,39 +277,35 @@ void ias::ensureMicPermissions(){
     }   
 }
 
-bool ias::ensureAVPermissions(){
-    // --- Camera ---
-    
+void ias::ensureCameraPermission(){
+
     QCameraPermission camPerm;
-    auto camStatus = qApp->checkPermission(camPerm);
 
-    if (camStatus != Qt::PermissionStatus::Granted) {
-	/*
-        bool finished = false;
+    switch (qApp->checkPermission(camPerm)) {
 
-        qApp->requestPermission(camPerm, this, [&](const QPermission &p){ 
-            (void) p;
-            finished = true;
-        });  
+    case Qt::PermissionStatus::Granted:
+        cout << "Camera permission is granted !" << endl;
+        this->initVideoAndSensor();
+        return;
 
-        // Wait for a callback once to avoid going down before the callback
-        QEventLoop loop;
-        QTimer timeout;
-        timeout.setSingleShot(true);
-        QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-        QTimer::singleShot(0, &loop, [&]{ if (finished) loop.quit(); });
-        timeout.start(5000);  // Wait up to 5 seconds
-        loop.exec();
+    case Qt::PermissionStatus::Undetermined:
+        qApp->requestPermission(camPerm, this, [this](const QPermission &permission){
+            if (permission.status() == Qt::PermissionStatus::Granted) {
+                cout << "Camera permission is granted !" << endl;
+                this->initVideoAndSensor();
+            } else {
+                cout << "Access to camera not granted" << endl;
+            }
+        });
+        return;
 
-        if (qApp->checkPermission(camPerm) != Qt::PermissionStatus::Granted) {
-            qWarning() << "Camera permission not granted.";
-            return false;
-        }    
-	*/
-    }    
-
-    return true;
-}    
+    case Qt::PermissionStatus::Denied:
+        cout << "Access to camera not granted. Enable it under "
+                "System Settings > Privacy & Security > Camera, then relaunch."
+             << endl;
+        return;
+    }
+}
 
 
 void ias::startVideo(int index) {
