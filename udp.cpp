@@ -38,5 +38,5 @@ void udp::readyRead(){
     /// ADD RECEIVED SAMPLES TO FIFO JITTER BUFFER
     for (unsigned int i=0;i<recBytes;i++) fifo.enqueue(outputPacket[i]);
 
-    //cout << fifo.size() << endl;
+    cout << fifo.size() << endl;
 }

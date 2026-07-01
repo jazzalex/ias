@@ -37,6 +37,22 @@
 
 #define bzero(b,len) (memset((b),'\0',(len)), (void)0)
 
+/// VIDEO RELATED INCLUDES
+#include "ui_camera.h"
+#include <QMediaCaptureSession>
+#include <QMediaDevices>
+#include <QBuffer>
+#include <QCamera>
+#include <QImageCapture>
+#include <QFile>
+#include <QScreen>
+#include <QPermissions>
+
+/// SENSOR RELATED
+#include <QAccelerometer>
+#include <QGyroscope>
+
+
 using namespace std;
 
 class ias : public QWidget{
@@ -82,11 +98,53 @@ public :
 
     callbackdata *dFC;
 
-    void ensureAVPermissions();
+    void ensureMicPermissions();
+    static bool ensureAVPermissions();
+
+    /// VIDEO RELATED
+    void startVideo(int index);
+
+    unsigned short videoDisplayWidth  = 1080;
+    unsigned short videoDisplayHeight = 1920;
+
+    Ui::Camera *ui;
+    
+    QList<QCameraDevice> availableCameras;
+    QCamera *camera;
+    QImageCapture imageCapture;
+    QMediaCaptureSession captureSession;
+    QScreen *screen = QGuiApplication::primaryScreen();
+    QTimer *captureTimer;
+
+    bool videoThreadRunning  = false;
+
+    unsigned short videoImageCounter;
+    bool videoReady;
+    int BW, JPEG, interleaved;
+    bool interleavedReady;
+    unsigned short packetFragments;
+    char videoResolution;
+    int saveVideoIndex;
+    struct timeval tVideoCallbackBegin, tVideoCallbackEnd;
+
+    /// SENSOR RELATED
+    QAccelerometer *sensor;
+    void getSensorData();
 
     private:
 
     public slots:
+
+        void captureImage();
+        void processImage(int requestId, const QImage &img);
+
+	/*
+        void errorSlot();
+        void videoBWSlot(int index);
+        void videoCompressionRatioSlot(int index);
+        void videoResolutionSlot(int index);
+        void videoInterleaverSlot(int index);
+	*/
 
     private slots:
 

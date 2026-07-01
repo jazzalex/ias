@@ -38,7 +38,7 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
     #endif
 
     /// CHOOSE IAS OPTION
-    int option = 0; /// 0: PLOT CALLBACK INTERVAL 1: RECTANGLE GENERATOR, 2: INPUT=OUTPUT, 3: NETWORK MIRROR
+    int option = 2; /// 0: PLOT CALLBACK INTERVAL 1: RECTANGLE GENERATOR, 2: INPUT=OUTPUT, 3: NETWORK MIRROR
 
     if (option == 0){
         #ifndef WIN32
@@ -60,7 +60,7 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
     }
 
 
-    if ( (option == 2) || (option == 3) ){
+    if (option == 2){
         /// OPTION 1: WRITE INPUTBUFFER TO OUTPUTBUFFER
         for (unsigned short i=0; i<framesPerBuffer*2;i++) {
             output[i] = input[i];
@@ -69,6 +69,8 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
 
 
     if (option == 3){
+        //cout << "SEND" << endl;
+
         /// FILL INPUT BUFFER
         for (unsigned short i=0; i<framesPerBuffer*2;i++) {
             my->myIAS->client.inputPacket[i] = input[i];
@@ -79,9 +81,10 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
 
 
         /// OPTION 2: READ FROM FIFO IF THRESHOLD IS REACHED
-        unsigned int threshold = 10;
+        unsigned int threshold = 500;
+
         if (my->myIAS->client.fifo.size() > (threshold * framesPerBuffer * 2) ){
-            for (unsigned int i=0; i < framesPerBuffer*2;i++) output[i] += my->myIAS->client.fifo.dequeue();
+            for (unsigned int i=0; i < framesPerBuffer*2;i++) output[i] = my->myIAS->client.fifo.dequeue();
         }
     }
 
@@ -105,7 +108,8 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
 ias::ias(){
 
     /// PREPARATIONS
-    this->ensureAVPermissions();
+    this->ensureMicPermissions();
+
     dFC = new callbackdata();
     dFC->even = false;
     dFC->myIAS = this;
@@ -139,7 +143,7 @@ ias::ias(){
     audiofault = false;
     soundIsRunning = false;
 
-    frameSize  = 128;
+    frameSize  = 512;
     sampleRate = 48000;
     audioChannels = 1;
 
@@ -149,7 +153,7 @@ ias::ias(){
 
     bzero( &inputParameters, sizeof( inputParameters ) );
     inputParameters.channelCount = audioChannels;
-    inputParameters.device = 2;//2;
+    inputParameters.device = 1;//2;
     inputParameters.sampleFormat = paInt16;
 
     inputParameters.hostApiSpecificStreamInfo = NULL;
@@ -164,7 +168,7 @@ ias::ias(){
     /// CONFIGURE OUTPUT AUDIODEVICE
     bzero( &outputParameters, sizeof( outputParameters ) );
     outputParameters.channelCount = audioChannels;
-    outputParameters.device = 3;//3;
+    outputParameters.device = 1;//3;
     outputParameters.sampleFormat = paInt16;
 
     outputParameters.hostApiSpecificStreamInfo = NULL;
@@ -212,6 +216,29 @@ ias::ias(){
         soundIsRunning = false;
         cout << "SOUND IS NOT RUNNING" << endl;
     }
+
+
+    /// VIDEO RELATED
+    ///
+    // Ensure permissions first
+    if ( !ensureAVPermissions() ) {
+        // This will make your current "Access to camera not granted" log consistent with the logic
+        std::cout << "Access to camera not granted" << std::endl;
+        return;
+    }
+
+    availableCameras = QMediaDevices::videoInputs();
+    cout << "Available cameras: " << availableCameras.size() << endl;
+
+    this->startVideo(0);
+
+
+    /// SENSOR RELATED
+    sensor = new QAccelerometer();
+    sensor->setAccelerationMode(QAccelerometer::User);
+    sensor->start();
+
+    this->getSensorData();
 }
 
 /// DESTRUCTOR
@@ -227,7 +254,7 @@ ias::~ias(){
 }
 
 /// ENSURE PERMISSIONS
-void ias::ensureAVPermissions(){
+void ias::ensureMicPermissions(){
 
     QMicrophonePermission microphonePermission;
        
@@ -245,5 +272,184 @@ void ias::ensureAVPermissions(){
 	cout << "Mic permission is granted !" << endl;
         break;
     }   
+}
+
+bool ias::ensureAVPermissions(){
+    // --- Camera ---
+    
+    QCameraPermission camPerm;
+    auto camStatus = qApp->checkPermission(camPerm);
+
+    if (camStatus != Qt::PermissionStatus::Granted) {
+	/*
+        bool finished = false;
+
+        qApp->requestPermission(camPerm, this, [&](const QPermission &p){ 
+            (void) p;
+            finished = true;
+        });  
+
+        // Wait for a callback once to avoid going down before the callback
+        QEventLoop loop;
+        QTimer timeout;
+        timeout.setSingleShot(true);
+        QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+        QTimer::singleShot(0, &loop, [&]{ if (finished) loop.quit(); });
+        timeout.start(5000);  // Wait up to 5 seconds
+        loop.exec();
+
+        if (qApp->checkPermission(camPerm) != Qt::PermissionStatus::Granted) {
+            qWarning() << "Camera permission not granted.";
+            return false;
+        }    
+	*/
+    }    
+
+    return true;
+}    
+
+
+void ias::startVideo(int index) {
+
+    videoDisplayWidth  = 1920;
+    videoDisplayHeight = 1080;
+
+    saveVideoIndex = index;
+
+    QSize resolution(videoDisplayWidth, videoDisplayHeight); //16:9
+
+    camera = new QCamera( availableCameras[index] );
+    //camera = new QCamera( QMediaDevices::defaultVideoInput() );
+
+    QCameraDevice cameraDevice = camera->cameraDevice();
+
+    QList imageFormats = cameraDevice.photoResolutions();
+    QList videoFormats = cameraDevice.videoFormats();
+
+    int howManyImage = imageFormats.size();
+
+    for (int i=0; i<howManyImage; i++){
+        /*
+        QSize resolulu = imageFormats[i];
+        cout << "IMAGE DEVICE HEIGHT: " << resolulu.height() << endl;
+        cout << "IMAGE DEVICE WIDTH : " << resolulu.width() << endl <<  endl;
+        */
+    }
+
+    int howManyVideo = videoFormats.size();
+
+    int thisOne = 0;
+
+    for (int i=0; i<howManyVideo; i++){
+        int videoWidth  = videoFormats[i].resolution().width();
+        int videoHeight = videoFormats[i].resolution().height();
+
+        ///* 
+        int maxFrame    = videoFormats[i].maxFrameRate();
+        int minFrame    = videoFormats[i].minFrameRate();
+
+        cout << "VIDEO DEVICE MAX FRAME: " << maxFrame << endl;
+        cout << "VIDEO DEVICE MIN FRAME: " << minFrame << endl;
+        cout << "VIDEO DEVICE HEIGHT   : " << videoHeight << endl;
+        cout << "VIDEO DEVICE WIDTH    : " << videoWidth << endl <<  endl;
+        //*/
+
+        if ( ( videoHeight == videoDisplayHeight ) && ( videoWidth == videoDisplayWidth ) ){
+            thisOne = i;
+            break;
+        }
+    }
+
+    /// SETTINGS FÜR IMAGE CAPTURE
+    captureSession.setCamera(camera);
+    captureSession.camera()->setCameraFormat( videoFormats[thisOne] );
+    captureSession.setImageCapture(&imageCapture);
+
+    imageCapture.setResolution(resolution);
+
+    connect(&imageCapture, &QImageCapture::imageCaptured, this, &ias::processImage);
+    camera->start();
+
+    //ui->comboResolutionBox->setItemData(0, 0, Qt::UserRole - 1);
+    ui->comboResolutionBox->setCurrentIndex(0);
+    ui->colorBwBox->setCurrentIndex(0);
+    ui->comboCodingBox->setItemData(1, 0, Qt::UserRole - 1);
+    ui->comboCodingBox->setCurrentIndex(0);
+    ui->comboInterleaverBox->setCurrentIndex(0);
+
+    videoResolution = 'N';
+    interleaved = 0;
+    BW = 0;
+    JPEG = 1;
+
+    //this->createStreamParameter();
+
+    #ifndef BROWSER_VIDEO_TRANSFER
+
+        cout << "SHOW VIDEO WINDOW" << endl;
+
+        this->setWindowFlags( (Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint) & ~Qt::WindowCloseButtonHint );
+        this->show();
+        this->move(0, 0);
+        this->raise();
+        this->activateWindow();
+    #endif
+
+    videoReady = true;
+}
+
+void ias::captureImage() {
+
+    //cout << "CAPTURE SLOT" << endl;
+
+    imageCapture.capture();
+}
+
+
+void ias::processImage(int requestId, const QImage &img) {
+
+/*
+    videoImageCounter++;
+
+    /// FOR DSV LECTURE
+    //cout << "PROCESS IMAGE: " << videoImageCounter << endl;
+
+    (void)requestId;
+
+/// MEASURE TIME BETWEEN VIDEO CALLBACKS
+#ifdef WIN32
+    this->gettimeofday(&tVideoCallbackBegin, NULL);
+#else
+    gettimeofday(&tVideoCallbackBegin, NULL);
+#endif
+
+    double zweiteMessung;
+    zweiteMessung = (double) ((tVideoCallbackBegin.tv_sec*1000) + (((double) tVideoCallbackBegin.tv_usec) / 1000));
+    double ersteMessung;
+    ersteMessung = (double) ((tVideoCallbackEnd.tv_sec*1000) + (((double) tVideoCallbackEnd.tv_usec) / 1000));
+
+    double videoInterval = zweiteMessung - ersteMessung;
+    (void) videoInterval;
+
+    //cout << "VIDEO INTERVAL: " << videoInterval << endl;
+
+    /// GET TIME FOR CODING LATENCY
+    struct timeval tValAfter, tValBefore;
+
+    #ifdef WIN32
+        this->gettimeofday(&tValBefore, NULL);
+    #else
+        gettimeofday(&tValBefore, NULL);
+    #endif
+    */
+}
+
+void ias::getSensorData(){
+    cout << "READ SENSOR" << endl;
+
+    cout << "X: " << (int) sensor->reading()->x() << endl;
+    cout << "Y: " << (int) sensor->reading()->y() << endl;
+    cout << "Z: " << (int) sensor->reading()->z() << endl;
+
 }
 

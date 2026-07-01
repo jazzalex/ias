@@ -107,7 +107,7 @@ CONFIG += thread qt warn_on exceptions
 
 CONFIG += console
 
-QT += core network widgets
+QT += core network widgets multimedia multimediawidgets sensors
 
 HEADERS += ias.h \
 	   udp.h
@@ -116,5 +116,4 @@ SOURCES += main.cpp \
            ias.cpp \
 	   udp.cpp
 
-
-
+FORMS += camera.ui
