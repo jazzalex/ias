@@ -108,6 +108,9 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
 ias::ias(){
 
     /// PREPARATIONS
+    ui = new Ui::Camera();
+    ui->setupUi(this);
+
     this->ensureMicPermissions();
 
     dFC = new callbackdata();
@@ -245,10 +248,26 @@ ias::~ias(){
 
     if (soundIsRunning){
         paErr = Pa_CloseStream( stream );
-        if (paErr == 0){ 
+        if (paErr == 0){
             soundIsRunning = false;
-        } 
-    } 
+        }
+    }
+
+    if (sensor != nullptr){
+        sensor->stop();
+        delete sensor;
+        sensor = nullptr;
+    }
+
+    if (camera != nullptr){
+        camera->stop();
+        captureSession.setCamera(nullptr);
+        delete camera;
+        camera = nullptr;
+    }
+
+    delete ui;
+    delete dFC;
 }
 
 /// ENSURE PERMISSIONS
