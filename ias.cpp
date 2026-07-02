@@ -240,6 +240,10 @@ void ias::initVideoAndSensor(){
     sensor->setAccelerationMode(QAccelerometer::User);
     connect(sensor, &QAccelerometer::readingChanged, this, &ias::getSensorData);
     sensor->start();
+
+    if (!sensor->isActive()) {
+        cout << "Accelerometer backend unavailable on this platform; no readings will arrive." << endl;
+    }
 }
 
 /// DESTRUCTOR
@@ -391,6 +395,13 @@ void ias::startVideo(int index) {
         captureSession.camera()->setCameraFormat( videoFormats[thisOne] );
     }
     captureSession.setImageCapture(&imageCapture);
+
+    /// LIVE PREVIEW: route the camera feed into the viewfinder widget and
+    /// bring it in front of the black display label.
+    captureSession.setVideoOutput(ui->viewfinder);
+    ui->viewfinder->setEnabled(true);
+    ui->viewfinder->setGeometry(0, 0, 1280, 672);
+    ui->viewfinder->raise();
 
     imageCapture.setResolution(resolution);
 
