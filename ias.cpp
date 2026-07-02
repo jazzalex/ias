@@ -108,6 +108,9 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
 ias::ias(){
 
     /// PREPARATIONS
+    ui = new Ui::Camera();
+    ui->setupUi(this);
+
     this->ensureMicPermissions();
 
     dFC = new callbackdata();
@@ -219,13 +222,12 @@ ias::ias(){
 
 
     /// VIDEO RELATED
-    ///
-    // Ensure permissions first
-    if ( !ensureAVPermissions() ) {
-        // This will make your current "Access to camera not granted" log consistent with the logic
-        std::cout << "Access to camera not granted" << std::endl;
-        return;
-    }
+    /// Camera permission is resolved asynchronously; initVideoAndSensor()
+    /// runs from the callback once permission is granted.
+    this->ensureCameraPermission();
+}
+
+void ias::initVideoAndSensor(){
 
     availableCameras = QMediaDevices::videoInputs();
     cout << "Available cameras: " << availableCameras.size() << endl;
@@ -236,9 +238,8 @@ ias::ias(){
     /// SENSOR RELATED
     sensor = new QAccelerometer();
     sensor->setAccelerationMode(QAccelerometer::User);
+    connect(sensor, &QAccelerometer::readingChanged, this, &ias::getSensorData);
     sensor->start();
-
-    this->getSensorData();
 }
 
 /// DESTRUCTOR
@@ -247,10 +248,26 @@ ias::~ias(){
 
     if (soundIsRunning){
         paErr = Pa_CloseStream( stream );
-        if (paErr == 0){ 
+        if (paErr == 0){
             soundIsRunning = false;
-        } 
-    } 
+        }
+    }
+
+    if (sensor != nullptr){
+        sensor->stop();
+        delete sensor;
+        sensor = nullptr;
+    }
+
+    if (camera != nullptr){
+        camera->stop();
+        captureSession.setCamera(nullptr);
+        delete camera;
+        camera = nullptr;
+    }
+
+    delete ui;
+    delete dFC;
 }
 
 /// ENSURE PERMISSIONS
@@ -261,7 +278,12 @@ void ias::ensureMicPermissions(){
     switch (qApp->checkPermission(microphonePermission)) {
 
     case Qt::PermissionStatus::Undetermined:
-        qApp->requestPermission(microphonePermission, this, &ias::ensureAVPermissions);
+        qApp->requestPermission(microphonePermission, this, [](const QPermission &permission){
+            if (permission.status() == Qt::PermissionStatus::Granted)
+                cout << "Mic permission is granted !" << endl;
+            else
+                qWarning("Microphone permission is not granted!");
+        });
         return;
 
     case Qt::PermissionStatus::Denied:
@@ -274,39 +296,35 @@ void ias::ensureMicPermissions(){
     }   
 }
 
-bool ias::ensureAVPermissions(){
-    // --- Camera ---
-    
+void ias::ensureCameraPermission(){
+
     QCameraPermission camPerm;
-    auto camStatus = qApp->checkPermission(camPerm);
 
-    if (camStatus != Qt::PermissionStatus::Granted) {
-	/*
-        bool finished = false;
+    switch (qApp->checkPermission(camPerm)) {
 
-        qApp->requestPermission(camPerm, this, [&](const QPermission &p){ 
-            (void) p;
-            finished = true;
-        });  
+    case Qt::PermissionStatus::Granted:
+        cout << "Camera permission is granted !" << endl;
+        this->initVideoAndSensor();
+        return;
 
-        // Wait for a callback once to avoid going down before the callback
-        QEventLoop loop;
-        QTimer timeout;
-        timeout.setSingleShot(true);
-        QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-        QTimer::singleShot(0, &loop, [&]{ if (finished) loop.quit(); });
-        timeout.start(5000);  // Wait up to 5 seconds
-        loop.exec();
+    case Qt::PermissionStatus::Undetermined:
+        qApp->requestPermission(camPerm, this, [this](const QPermission &permission){
+            if (permission.status() == Qt::PermissionStatus::Granted) {
+                cout << "Camera permission is granted !" << endl;
+                this->initVideoAndSensor();
+            } else {
+                cout << "Access to camera not granted" << endl;
+            }
+        });
+        return;
 
-        if (qApp->checkPermission(camPerm) != Qt::PermissionStatus::Granted) {
-            qWarning() << "Camera permission not granted.";
-            return false;
-        }    
-	*/
-    }    
-
-    return true;
-}    
+    case Qt::PermissionStatus::Denied:
+        cout << "Access to camera not granted. Enable it under "
+                "System Settings > Privacy & Security > Camera, then relaunch."
+             << endl;
+        return;
+    }
+}
 
 
 void ias::startVideo(int index) {
@@ -315,6 +333,13 @@ void ias::startVideo(int index) {
     videoDisplayHeight = 1080;
 
     saveVideoIndex = index;
+
+    if ( index < 0 || index >= availableCameras.size() ) {
+        cout << "No camera available at index " << index
+             << " (available: " << availableCameras.size() << ")" << endl;
+        videoReady = false;
+        return;
+    }
 
     QSize resolution(videoDisplayWidth, videoDisplayHeight); //16:9
 
@@ -362,7 +387,9 @@ void ias::startVideo(int index) {
 
     /// SETTINGS FÜR IMAGE CAPTURE
     captureSession.setCamera(camera);
-    captureSession.camera()->setCameraFormat( videoFormats[thisOne] );
+    if ( thisOne < videoFormats.size() ) {
+        captureSession.camera()->setCameraFormat( videoFormats[thisOne] );
+    }
     captureSession.setImageCapture(&imageCapture);
 
     imageCapture.setResolution(resolution);
@@ -447,9 +474,16 @@ void ias::processImage(int requestId, const QImage &img) {
 void ias::getSensorData(){
     cout << "READ SENSOR" << endl;
 
-    cout << "X: " << (int) sensor->reading()->x() << endl;
-    cout << "Y: " << (int) sensor->reading()->y() << endl;
-    cout << "Z: " << (int) sensor->reading()->z() << endl;
+    if ( sensor == nullptr || sensor->reading() == nullptr ) {
+        cout << "No sensor reading available yet" << endl;
+        return;
+    }
+
+    QAccelerometerReading *reading = sensor->reading();
+
+    cout << "X: " << (int) reading->x() << endl;
+    cout << "Y: " << (int) reading->y() << endl;
+    cout << "Z: " << (int) reading->z() << endl;
 
 }
 

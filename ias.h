@@ -1,7 +1,7 @@
 #ifndef H_IAS_
   #define H_IAS_
 
-#include <QWidget>
+#include <QMainWindow>
 #include <QPermissions>
 #include <QTimer>
 
@@ -55,7 +55,7 @@
 
 using namespace std;
 
-class ias : public QWidget{
+class ias : public QMainWindow{
 
 Q_OBJECT
 
@@ -99,9 +99,10 @@ public :
     callbackdata *dFC;
 
     void ensureMicPermissions();
-    static bool ensureAVPermissions();
+    void ensureCameraPermission();
 
     /// VIDEO RELATED
+    void initVideoAndSensor();
     void startVideo(int index);
 
     unsigned short videoDisplayWidth  = 1080;
@@ -110,7 +111,7 @@ public :
     Ui::Camera *ui;
     
     QList<QCameraDevice> availableCameras;
-    QCamera *camera;
+    QCamera *camera = nullptr;
     QImageCapture imageCapture;
     QMediaCaptureSession captureSession;
     QScreen *screen = QGuiApplication::primaryScreen();
@@ -128,7 +129,7 @@ public :
     struct timeval tVideoCallbackBegin, tVideoCallbackEnd;
 
     /// SENSOR RELATED
-    QAccelerometer *sensor;
+    QAccelerometer *sensor = nullptr;
     void getSensorData();
 
     private:
