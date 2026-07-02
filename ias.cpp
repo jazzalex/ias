@@ -99,6 +99,8 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
     my->before = (double) ((result.tv_sec*1000) + (((double) result.tv_usec) / 1000));
 
 
+    my->myIAS->captureImage(); 
+
     return 0;
 }
 
@@ -109,6 +111,7 @@ ias::ias(){
 
     /// PREPARATIONS
     ui = new Ui::Camera();
+
     ui->setupUi(this);
 
     this->ensureMicPermissions();
@@ -225,8 +228,13 @@ ias::ias(){
     /// Camera permission is resolved asynchronously; initVideoAndSensor()
     /// runs from the callback once permission is granted.
     this->ensureCameraPermission();
+
     videoBuffer = new unsigned char[1000000];
 
+    connect(ui->colorBwBox, SIGNAL(currentIndexChanged(int)), this, SLOT(videoBWSlot(int)));
+    connect(ui->comboResolutionBox, SIGNAL(currentIndexChanged(int)), this, SLOT(videoResolutionSlot(int)));
+    connect(ui->comboInterleaverBox, SIGNAL(currentIndexChanged(int)), this, SLOT(videoInterleaverSlot(int)));
+    connect(ui->comboCodingBox, SIGNAL(currentIndexChanged(int)), this,SLOT(videoCompressionRatioSlot(int)));
 }
 
 void ias::initVideoAndSensor(){
@@ -332,6 +340,44 @@ void ias::ensureCameraPermission(){
     }
 }
 
+void ias::videoBWSlot(int index) {
+    if (index == 1)
+        BW = 1; 
+    else 
+        BW = 0; 
+}
+
+void ias::videoCompressionRatioSlot(int index) {
+    if (index == 0)
+        JPEG = 1; 
+    if (index == 1)
+        JPEG = 0; 
+}
+
+void ias::videoResolutionSlot(int index) {
+     cout << "RATIO SLOT: " <<  index << endl;
+
+    if (index == 0)
+        videoResolution = 'N'; 
+    if (index == 1)
+        videoResolution = 'A'; 
+    if (index == 2)
+        videoResolution = 'B'; 
+    if (index == 3)
+        videoResolution = 'C'; 
+    if (index == 4)
+        videoResolution = 'D'; 
+}
+
+void ias::videoInterleaverSlot(int index) {
+    if (index == 0) {
+        interleaved = 0;
+        interleavedReady = false;
+    }
+    if (index == 1) 
+        interleaved = 1;
+}
+
 
 void ias::startVideo(int index) {
 
@@ -404,13 +450,14 @@ void ias::startVideo(int index) {
     ui->viewfinder->setEnabled(true);
     ui->viewfinder->setGeometry(0, 0, 1280, 672);
     ui->viewfinder->raise();
+    ui->viewfinder->setVisible(false);
 
     imageCapture.setResolution(resolution);
 
     connect(&imageCapture, &QImageCapture::imageCaptured, this, &ias::processImage);
+
     camera->start();
 
-    //ui->comboResolutionBox->setItemData(0, 0, Qt::UserRole - 1);
     ui->comboResolutionBox->setCurrentIndex(0);
     ui->colorBwBox->setCurrentIndex(0);
     ui->comboCodingBox->setItemData(1, 0, Qt::UserRole - 1);
@@ -422,26 +469,18 @@ void ias::startVideo(int index) {
     BW = 0;
     JPEG = 1;
 
-    //this->createStreamParameter();
+    cout << "SHOW VIDEO WINDOW" << endl;
 
-    #ifndef BROWSER_VIDEO_TRANSFER
-
-        cout << "SHOW VIDEO WINDOW" << endl;
-
-        this->setWindowFlags( (Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint) & ~Qt::WindowCloseButtonHint );
-        this->show();
-        this->move(0, 0);
-        this->raise();
-        this->activateWindow();
-    #endif
+    this->setWindowFlags( (Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint) & ~Qt::WindowCloseButtonHint );
+    this->show();
+    this->move(0, 0);
+    this->raise();
+    this->activateWindow();
 
     videoReady = true;
 }
 
 void ias::captureImage() {
-
-    //cout << "CAPTURE SLOT" << endl;
-
     imageCapture.capture();
 }
 

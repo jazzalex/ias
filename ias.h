@@ -117,7 +117,7 @@ public :
     QScreen *screen = QGuiApplication::primaryScreen();
     QTimer *captureTimer;
 
-    bool videoThreadRunning  = false;
+    bool videoThreadRunning  = true;
 
     unsigned char *videoBuffer;
 
@@ -130,6 +130,14 @@ public :
     int saveVideoIndex;
     struct timeval tVideoCallbackBegin, tVideoCallbackEnd;
 
+    /*
+    boost::thread videoThread;
+    boost::mutex videoMutex;
+    boost::condition_variable videoLock;
+    
+    void videoGo();
+    */
+
     /// SENSOR RELATED
     QAccelerometer *sensor = nullptr;
     void getSensorData();
@@ -141,13 +149,10 @@ public :
         void captureImage();
         void processImage(int requestId, const QImage &img);
 
-	/*
-        void errorSlot();
         void videoBWSlot(int index);
         void videoCompressionRatioSlot(int index);
         void videoResolutionSlot(int index);
         void videoInterleaverSlot(int index);
-	*/
 
     private slots:
 

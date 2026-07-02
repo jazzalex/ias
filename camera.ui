@@ -106,11 +106,6 @@
       <string>linear</string>
      </property>
     </item>
-    <item>
-     <property name="text">
-      <string>JPEG XS</string>
-     </property>
-    </item>
    </widget>
    <widget class="QLabel" name="display">
     <property name="geometry">
