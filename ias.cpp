@@ -225,6 +225,8 @@ ias::ias(){
     /// Camera permission is resolved asynchronously; initVideoAndSensor()
     /// runs from the callback once permission is granted.
     this->ensureCameraPermission();
+    videoBuffer = new unsigned char[1000000];
+
 }
 
 void ias::initVideoAndSensor(){
@@ -446,7 +448,6 @@ void ias::captureImage() {
 
 void ias::processImage(int requestId, const QImage &img) {
 
-/*
     videoImageCounter++;
 
     /// FOR DSV LECTURE
@@ -454,12 +455,12 @@ void ias::processImage(int requestId, const QImage &img) {
 
     (void)requestId;
 
-/// MEASURE TIME BETWEEN VIDEO CALLBACKS
-#ifdef WIN32
-    this->gettimeofday(&tVideoCallbackBegin, NULL);
-#else
-    gettimeofday(&tVideoCallbackBegin, NULL);
-#endif
+    /// MEASURE TIME BETWEEN VIDEO CALLBACKS
+    #ifdef WIN32
+        this->gettimeofday(&tVideoCallbackBegin, NULL);
+    #else
+        gettimeofday(&tVideoCallbackBegin, NULL);
+    #endif
 
     double zweiteMessung;
     zweiteMessung = (double) ((tVideoCallbackBegin.tv_sec*1000) + (((double) tVideoCallbackBegin.tv_usec) / 1000));
@@ -479,7 +480,174 @@ void ias::processImage(int requestId, const QImage &img) {
     #else
         gettimeofday(&tValBefore, NULL);
     #endif
-    */
+
+    QSize reso;
+        
+    //cout << videoResolution << endl;
+
+    switch (videoResolution) {
+        case 'D': 
+            reso.setWidth(videoDisplayWidth/12);
+            reso.setHeight(videoDisplayHeight/12);
+            break;
+            // 2.16 Mbps // 10800 Color bytes / 1000 Bytes --> 10,8 Pakete
+        case 'C': 
+            reso.setWidth(videoDisplayWidth/6);
+            reso.setHeight(videoDisplayHeight/6);
+            break;
+            // 8,65 Mbps // 43200 Color bytes / 1000 Bytes  --> 43,2 Pakete
+        case 'B': 
+            reso.setWidth(videoDisplayWidth/3);
+            reso.setHeight(videoDisplayHeight/3);
+            break;
+            // 34,58 Mbps // 172800 Color bytes / 1000 Bytes --> 172,8 Pakete
+        case 'A': 
+            reso.setWidth(videoDisplayWidth/1.5);
+            reso.setHeight(videoDisplayHeight/1.5);
+            break;
+            // 46,08 Mbps // 230400 BW bytes / 1000 Bytes --> 230,4 Pakete
+            // 138,32 Mbps // 691200 Color bytes / 1000 Bytes --> 691,2 Pakete
+        case 'N': 
+            reso.setWidth(videoDisplayWidth);
+            reso.setHeight(videoDisplayHeight);
+            break;
+    }    
+
+    QImage scaledImage;
+
+    /// BILD RUNTERSKALIEREN
+    //cout << "VOR SCALE" << endl;    
+    scaledImage = img.scaled(reso, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    /// ALPHA RAUS, R&B TAUSCHEN UND BW
+    unsigned int imageSize = scaledImage.sizeInBytes();
+    unsigned int newImageSize = (imageSize / 4) * 3; // ALPHA BYTE RAUS
+    unsigned char *imgBuffer = NULL;
+    imgBuffer = scaledImage.bits();
+    vector<float> pic_vector(newImageSize);
+    int counter = 0;
+    int bw_counter = 0;
+
+    unsigned char *imgBufferOut = new unsigned char[newImageSize];
+
+    //cout << imageSize << endl;
+
+    if (videoResolution != 'N'){
+        for (unsigned int index = 0; index < imageSize; index = index + 4) {
+            /// LOCAL VIDEO BUFFER ERSTELLEN
+            pic_vector[counter] = static_cast<float>(imgBuffer[index + 0]);     //+2
+            pic_vector[counter + 1] = static_cast<float>(imgBuffer[index + 1]); //+1
+            pic_vector[counter + 2] = static_cast<float>(imgBuffer[index +2]);  //+0
+
+            if (BW == 1) {
+                pic_vector[counter] = 0.21 * pic_vector[counter] +
+                                      0.72 * pic_vector[counter + 1] +
+                                      0.07 * pic_vector[counter + 2];
+                pic_vector[counter + 1] = pic_vector[counter];
+                pic_vector[counter + 2] = pic_vector[counter];
+            }
+
+            imgBufferOut[counter] = static_cast<unsigned char>(pic_vector[counter]);
+            imgBufferOut[counter + 1] = static_cast<unsigned char>(pic_vector[counter + 1]);
+            imgBufferOut[counter + 2] = static_cast<unsigned char>(pic_vector[counter + 2]);
+
+            /// SEND VIDEO BUFFER ERSTELLEN
+            if (BW == 0) {
+                videoBuffer[counter] = imgBufferOut[counter];
+                videoBuffer[counter + 1] = imgBufferOut[counter + 1];
+                videoBuffer[counter + 2] = imgBufferOut[counter + 2];
+            } else {
+                videoBuffer[bw_counter] = imgBufferOut[counter];
+            }
+
+            bw_counter++;
+            counter += 3;
+        }
+    }
+
+    /// JPEG ARRAY DEKLARIEREN
+    QByteArray finalJpg;
+
+
+    if (JPEG) {
+        //cout << videoDisplayHeight << " " << videoDisplayWidth << " " << reso.height() << " " << reso.width() << endl;
+
+        QImage *jpgImg;
+        if (videoResolution != 'N')
+            jpgImg = new QImage(imgBufferOut, reso.width(), reso.height(), QImage::Format_RGB888);
+        else{
+            if (BW == 1) jpgImg = new QImage( img.convertToFormat(QImage::Format_Grayscale8) );
+            else jpgImg = new QImage(img);
+        }
+
+        QByteArray ba;
+        QBuffer bufferJpeg(&ba);
+        bufferJpeg.open(QIODevice::WriteOnly);
+
+        jpgImg->save(&bufferJpeg, "JPG");
+        finalJpg = bufferJpeg.data();
+
+        char *encodedData = finalJpg.data();
+
+        for (int i = 0; i < finalJpg.size(); i++){
+            videoBuffer[i] = (unsigned char) encodedData[i];
+        }
+
+        // cout << "JPEG - SIZE: " << finalJpg.size() << endl;
+
+        delete jpgImg;
+
+    } else {
+        if (BW == 0){
+	    //cout << "COLOR UNCOMPRESSED SIZE: " << newImageSize << endl;
+	} else{
+	   //cout << "BW UNCOMPRESSED SIZE: " << newImageSize/3 << endl;
+	}
+    }
+
+    /// KLEINES BILD IM NEUEN FORMAT KREIEREN
+    QImage *displayBufferImg = new QImage(imgBufferOut, reso.width(), reso.height(), QImage::Format_RGB888);
+
+    if (JPEG) {
+
+        //cout << "DECODE JPG" << endl;        
+
+        QPixmap jpgPixmap;
+        jpgPixmap.loadFromData(finalJpg, "JPG");
+
+        *displayBufferImg = jpgPixmap.toImage();
+
+        //cout << "JPG-SIZE: " << finalJpg.size() << endl;
+    }
+
+    //cout << "VOR HOCHSKALIEREN" << endl;
+    ///BILD HOCHSKALIEREN
+
+    QSize scale_rect( this->ui->centralWidget->width(), this->ui->centralWidget->height() );
+    QImage image2 = displayBufferImg->scaled(scale_rect, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    //cout << "DOWNSCALE-SIZE: " << displayBufferImg->sizeInBytes() << endl;
+
+    // BILD DARSTELLEN
+    this->ui->display->setPixmap(QPixmap::fromImage(image2));
+
+    delete[] imgBufferOut;
+    delete displayBufferImg;
+
+    #ifdef WIN32
+        this->gettimeofday(&tValAfter, NULL);
+    #else
+        gettimeofday(&tValAfter, NULL);
+    #endif
+
+    // cout << "Delay: " << ( tValAfter.tv_usec - tValBefore.tv_usec ) << endl;
+
+    /// GET VIDEOCALLBACK-INSTANT FOR INTERVAL MEASUREMENT
+    #ifdef WIN32
+        this->gettimeofday(&tVideoCallbackEnd, NULL);
+    #else
+        gettimeofday(&tVideoCallbackEnd, NULL);
+    #endif
 }
 
 void ias::getSensorData(){

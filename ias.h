@@ -119,6 +119,8 @@ public :
 
     bool videoThreadRunning  = false;
 
+    unsigned char *videoBuffer;
+
     unsigned short videoImageCounter;
     bool videoReady;
     int BW, JPEG, interleaved;
