@@ -98,9 +98,6 @@ static int portAudioCallback( const void *inputBuffer, void *outputBuffer,
     #endif
     my->before = (double) ((result.tv_sec*1000) + (((double) result.tv_usec) / 1000));
 
-
-    my->myIAS->captureImage(); 
-
     return 0;
 }
 
@@ -224,9 +221,7 @@ ias::ias(){
     }
 
 
-    /// VIDEO RELATED
-    /// Camera permission is resolved asynchronously; initVideoAndSensor()
-    /// runs from the callback once permission is granted.
+    /// VIDEO AND SENSOR RELATED
     this->ensureCameraPermission();
 
     videoBuffer = new unsigned char[1000000];
@@ -235,6 +230,12 @@ ias::ias(){
     connect(ui->comboResolutionBox, SIGNAL(currentIndexChanged(int)), this, SLOT(videoResolutionSlot(int)));
     connect(ui->comboInterleaverBox, SIGNAL(currentIndexChanged(int)), this, SLOT(videoInterleaverSlot(int)));
     connect(ui->comboCodingBox, SIGNAL(currentIndexChanged(int)), this,SLOT(videoCompressionRatioSlot(int)));
+
+    this->initVideoAndSensor();
+
+    captureTimer = new QTimer(this);
+    connect( captureTimer, SIGNAL( timeout() ), this, SLOT( captureImage() ) );
+    captureTimer->start(25);
 }
 
 void ias::initVideoAndSensor(){
@@ -325,7 +326,6 @@ void ias::ensureCameraPermission(){
         qApp->requestPermission(camPerm, this, [this](const QPermission &permission){
             if (permission.status() == Qt::PermissionStatus::Granted) {
                 cout << "Camera permission is granted !" << endl;
-                this->initVideoAndSensor();
             } else {
                 cout << "Access to camera not granted" << endl;
             }
