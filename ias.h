@@ -119,24 +119,13 @@ public :
 
     bool videoThreadRunning  = true;
 
-    unsigned char *videoBuffer;
-
     unsigned short videoImageCounter;
     bool videoReady;
-    int BW, JPEG, interleaved;
-    bool interleavedReady;
+    int BW, JPEG; 
     unsigned short packetFragments;
     char videoResolution;
     int saveVideoIndex;
     struct timeval tVideoCallbackBegin, tVideoCallbackEnd;
-
-    /*
-    boost::thread videoThread;
-    boost::mutex videoMutex;
-    boost::condition_variable videoLock;
-    
-    void videoGo();
-    */
 
     /// SENSOR RELATED
     QAccelerometer *sensor = nullptr;
@@ -152,7 +141,6 @@ public :
         void videoBWSlot(int index);
         void videoCompressionRatioSlot(int index);
         void videoResolutionSlot(int index);
-        void videoInterleaverSlot(int index);
 
     private slots:
 

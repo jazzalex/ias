@@ -224,11 +224,8 @@ ias::ias(){
     /// VIDEO AND SENSOR RELATED
     this->ensureCameraPermission();
 
-    videoBuffer = new unsigned char[1000000];
-
     connect(ui->colorBwBox, SIGNAL(currentIndexChanged(int)), this, SLOT(videoBWSlot(int)));
     connect(ui->comboResolutionBox, SIGNAL(currentIndexChanged(int)), this, SLOT(videoResolutionSlot(int)));
-    connect(ui->comboInterleaverBox, SIGNAL(currentIndexChanged(int)), this, SLOT(videoInterleaverSlot(int)));
     connect(ui->comboCodingBox, SIGNAL(currentIndexChanged(int)), this,SLOT(videoCompressionRatioSlot(int)));
 
     this->initVideoAndSensor();
@@ -369,16 +366,6 @@ void ias::videoResolutionSlot(int index) {
         videoResolution = 'D'; 
 }
 
-void ias::videoInterleaverSlot(int index) {
-    if (index == 0) {
-        interleaved = 0;
-        interleavedReady = false;
-    }
-    if (index == 1) 
-        interleaved = 1;
-}
-
-
 void ias::startVideo(int index) {
 
     videoDisplayWidth  = 1920;
@@ -395,8 +382,8 @@ void ias::startVideo(int index) {
 
     QSize resolution(videoDisplayWidth, videoDisplayHeight); //16:9
 
-    camera = new QCamera( availableCameras[index] );
-    //camera = new QCamera( QMediaDevices::defaultVideoInput() );
+    //camera = new QCamera( availableCameras[index] );
+    camera = new QCamera( QMediaDevices::defaultVideoInput() );
 
     QCameraDevice cameraDevice = camera->cameraDevice();
 
@@ -407,9 +394,9 @@ void ias::startVideo(int index) {
 
     for (int i=0; i<howManyImage; i++){
         /*
-        QSize resolulu = imageFormats[i];
-        cout << "IMAGE DEVICE HEIGHT: " << resolulu.height() << endl;
-        cout << "IMAGE DEVICE WIDTH : " << resolulu.width() << endl <<  endl;
+        QSize resolu = imageFormats[i];
+        cout << "IMAGE DEVICE HEIGHT: " << resolu.height() << endl;
+        cout << "IMAGE DEVICE WIDTH : " << resolu.width() << endl <<  endl;
         */
     }
 
@@ -462,10 +449,9 @@ void ias::startVideo(int index) {
     ui->colorBwBox->setCurrentIndex(0);
     ui->comboCodingBox->setItemData(1, 0, Qt::UserRole - 1);
     ui->comboCodingBox->setCurrentIndex(0);
-    ui->comboInterleaverBox->setCurrentIndex(0);
+    ui->comboInterleaverBox->setVisible(false);
 
     videoResolution = 'N';
-    interleaved = 0;
     BW = 0;
     JPEG = 1;
 
@@ -489,7 +475,6 @@ void ias::processImage(int requestId, const QImage &img) {
 
     videoImageCounter++;
 
-    /// FOR DSV LECTURE
     //cout << "PROCESS IMAGE: " << videoImageCounter << endl;
 
     (void)requestId;
@@ -529,23 +514,18 @@ void ias::processImage(int requestId, const QImage &img) {
             reso.setWidth(videoDisplayWidth/12);
             reso.setHeight(videoDisplayHeight/12);
             break;
-            // 2.16 Mbps // 10800 Color bytes / 1000 Bytes --> 10,8 Pakete
         case 'C': 
             reso.setWidth(videoDisplayWidth/6);
             reso.setHeight(videoDisplayHeight/6);
             break;
-            // 8,65 Mbps // 43200 Color bytes / 1000 Bytes  --> 43,2 Pakete
         case 'B': 
             reso.setWidth(videoDisplayWidth/3);
             reso.setHeight(videoDisplayHeight/3);
             break;
-            // 34,58 Mbps // 172800 Color bytes / 1000 Bytes --> 172,8 Pakete
         case 'A': 
             reso.setWidth(videoDisplayWidth/1.5);
             reso.setHeight(videoDisplayHeight/1.5);
             break;
-            // 46,08 Mbps // 230400 BW bytes / 1000 Bytes --> 230,4 Pakete
-            // 138,32 Mbps // 691200 Color bytes / 1000 Bytes --> 691,2 Pakete
         case 'N': 
             reso.setWidth(videoDisplayWidth);
             reso.setHeight(videoDisplayHeight);
@@ -554,18 +534,16 @@ void ias::processImage(int requestId, const QImage &img) {
 
     QImage scaledImage;
 
-    /// BILD RUNTERSKALIEREN
-    //cout << "VOR SCALE" << endl;    
+    /// SCALE DOWN IMAGE
     scaledImage = img.scaled(reso, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
-    /// ALPHA RAUS, R&B TAUSCHEN UND BW
+    /// NO ALPHA, SWITCH R&B AND BW
     unsigned int imageSize = scaledImage.sizeInBytes();
-    unsigned int newImageSize = (imageSize / 4) * 3; // ALPHA BYTE RAUS
+    unsigned int newImageSize = (imageSize / 4) * 3; // ALPHA OUT
     unsigned char *imgBuffer = NULL;
     imgBuffer = scaledImage.bits();
     vector<float> pic_vector(newImageSize);
     int counter = 0;
-    int bw_counter = 0;
 
     unsigned char *imgBufferOut = new unsigned char[newImageSize];
 
@@ -573,7 +551,7 @@ void ias::processImage(int requestId, const QImage &img) {
 
     if (videoResolution != 'N'){
         for (unsigned int index = 0; index < imageSize; index = index + 4) {
-            /// LOCAL VIDEO BUFFER ERSTELLEN
+            /// CREATE LOCAL VIDEO BUFFER
             pic_vector[counter] = static_cast<float>(imgBuffer[index + 0]);     //+2
             pic_vector[counter + 1] = static_cast<float>(imgBuffer[index + 1]); //+1
             pic_vector[counter + 2] = static_cast<float>(imgBuffer[index +2]);  //+0
@@ -590,16 +568,6 @@ void ias::processImage(int requestId, const QImage &img) {
             imgBufferOut[counter + 1] = static_cast<unsigned char>(pic_vector[counter + 1]);
             imgBufferOut[counter + 2] = static_cast<unsigned char>(pic_vector[counter + 2]);
 
-            /// SEND VIDEO BUFFER ERSTELLEN
-            if (BW == 0) {
-                videoBuffer[counter] = imgBufferOut[counter];
-                videoBuffer[counter + 1] = imgBufferOut[counter + 1];
-                videoBuffer[counter + 2] = imgBufferOut[counter + 2];
-            } else {
-                videoBuffer[bw_counter] = imgBufferOut[counter];
-            }
-
-            bw_counter++;
             counter += 3;
         }
     }
@@ -628,10 +596,6 @@ void ias::processImage(int requestId, const QImage &img) {
 
         char *encodedData = finalJpg.data();
 
-        for (int i = 0; i < finalJpg.size(); i++){
-            videoBuffer[i] = (unsigned char) encodedData[i];
-        }
-
         // cout << "JPEG - SIZE: " << finalJpg.size() << endl;
 
         delete jpgImg;
@@ -644,7 +608,7 @@ void ias::processImage(int requestId, const QImage &img) {
 	}
     }
 
-    /// KLEINES BILD IM NEUEN FORMAT KREIEREN
+    /// CREATE SMALLER IMAGE IN NEW FORMAT
     QImage *displayBufferImg = new QImage(imgBufferOut, reso.width(), reso.height(), QImage::Format_RGB888);
 
     if (JPEG) {
@@ -659,15 +623,14 @@ void ias::processImage(int requestId, const QImage &img) {
         //cout << "JPG-SIZE: " << finalJpg.size() << endl;
     }
 
-    //cout << "VOR HOCHSKALIEREN" << endl;
-    ///BILD HOCHSKALIEREN
+    ///SCALE IMAGE UP
 
     QSize scale_rect( this->ui->centralWidget->width(), this->ui->centralWidget->height() );
     QImage image2 = displayBufferImg->scaled(scale_rect, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
     //cout << "DOWNSCALE-SIZE: " << displayBufferImg->sizeInBytes() << endl;
 
-    // BILD DARSTELLEN
+    // SHOW IMAGE
     this->ui->display->setPixmap(QPixmap::fromImage(image2));
 
     delete[] imgBufferOut;
