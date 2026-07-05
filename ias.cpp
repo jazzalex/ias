@@ -206,7 +206,7 @@ ias::ias(){
             PaAlsa_EnableRealtimeScheduling(stream,true);
         #endif
 
-        paErr = Pa_StartStream(stream);
+        paErr = 0;//Pa_StartStream(stream);
         if (paErr==paNoError){
             soundIsRunning = true;
             cout << "SOUND IS RUNNING" << endl;
@@ -447,7 +447,7 @@ void ias::startVideo(int index) {
 
     ui->comboResolutionBox->setCurrentIndex(0);
     ui->colorBwBox->setCurrentIndex(0);
-    ui->comboCodingBox->setItemData(1, 0, Qt::UserRole - 1);
+    //ui->comboCodingBox->setItemData(1, 0, Qt::UserRole - 1);
     ui->comboCodingBox->setCurrentIndex(0);
     ui->comboInterleaverBox->setVisible(false);
 
