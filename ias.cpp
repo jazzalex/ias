@@ -232,7 +232,7 @@ ias::ias(){
 
     captureTimer = new QTimer(this);
     connect( captureTimer, SIGNAL( timeout() ), this, SLOT( captureImage() ) );
-    captureTimer->start(25);
+    captureTimer->start(40);
 }
 
 void ias::initVideoAndSensor(){
@@ -246,6 +246,7 @@ void ias::initVideoAndSensor(){
     /// SENSOR RELATED
     sensor = new QAccelerometer();
     sensor->setAccelerationMode(QAccelerometer::User);
+    sensor->setDataRate(100);
     connect(sensor, &QAccelerometer::readingChanged, this, &ias::getSensorData);
     sensor->start();
 
